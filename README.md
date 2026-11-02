@@ -2,114 +2,104 @@
 
 **Bi-stream Cross-modal Morphology-aware Hierarchical Network for Thin-Structure Segmentation**
 
-BiMorphNet 面向光学与 SAR 双模态遥感影像中的线性农田防护林（Linear Farmland Shelterbelts, LFS）二值语义分割，结合跨模态交互、通道依赖重标定、层级特征传递与细节引导重建，兼顾目标判别与细窄结构恢复。
+BiMorphNet 用于光学与 SAR 遥感影像中的线性农田防护林（Linear Farmland Shelterbelts, LFS）二值语义分割。本仓库提供模型、实验配置、损失函数、评价指标及权重管理工具，暂未提供数据加载器、完整训练与测试入口、数据集和训练权重。
 
-本仓库当前提供网络实现、配置以及损失函数、评价指标和权重等辅助工具。当前版本不包含数据加载器、完整训练/测试入口、数据集或预训练权重。
-
-## Model overview
+## 模型组成
 
 | 组件 | 名称 | 代码入口 |
 | --- | --- | --- |
 | 双分支编码 | Independent optical/SAR residual encoders | `encoder.rgb_backbone`、`encoder.sar_backbone` |
-| RCGI | Reciprocal Cross-modal Gated Interaction | `RCGI`；`encoder.low_rcgi`、`mid1_rcgi`、`mid2_rcgi`、`high_rcgi` |
+| RCGI | Reciprocal Cross-modal Gated Interaction | `encoder.low_rcgi`、`mid1_rcgi`、`mid2_rcgi`、`high_rcgi` |
 | KDRM | Kernelized Dependency-Relevance Modulation | `Model/KDRM.py`；`decoder.kdrm` |
-| HCFR | Hierarchical Cross-modal Feature Relay | `decoder.hcfr_relay`；`hcfr_fc1`—`hcfr_fc4` 及对应投影 |
+| HCFR | Hierarchical Cross-modal Feature Relay | `decoder.hcfr_relay` 及四级特征投影 |
 | HDGR | Hierarchical Detail-Guided Reconstruction | `decoder.hdgr_reconstruct` |
 
-HDGR 组合级联 FADE、同尺度门控融合以及末端 DUpsampling，保留 FADE 和 DUpsampling 的原方法名称。默认骨干为 `resnet101`，解码通道数为 256；双分支编码器参数独立。`pretrained=True` 当前不受支持，模型初始化不会自动下载 ImageNet 权重。
+默认骨干为两条参数独立的 ResNet-101，解码通道数为256。HDGR 结合级联 FADE、同尺度门控融合和末端 DUpsampling。模型不会自动下载 ImageNet 权重，当前不支持 `pretrained=True`。
 
-## Environment
+## 测试环境
 
-### Locally verified environment
-
-以下为 **2026-11-02 实测运行当前代码的本机环境**，用于说明已验证的运行条件，并非所有历史训练实验的环境追溯记录。
+以下环境于2026-11-02通过默认模型的 GPU 前向测试；未据此推定历史训练时所有软件包的版本。
 
 | 项目 | 版本或配置 |
 | --- | --- |
-| 操作系统 | Windows，系统 build `10.0.26200`，64 位 |
-| Python | `3.10.16`（Anaconda） |
-| PyTorch | `2.8.0.dev20250320+cu128` |
+| 操作系统 | Windows 64位，build `10.0.26200` |
+| Python | `3.10.16` |
+| PyTorch | `2.8.0.dev20250320+cu128`（nightly） |
 | PyTorch CUDA 构建版本 | `12.8` |
-| cuDNN | `torch.backends.cudnn.version() = 90701`（9.7.1） |
-| GPU | NVIDIA GeForce RTX 5070 Ti，16 GB 显存级别 |
-| 系统内存 | 64 GB 级别 |
+| cuDNN | `9.7.1` |
+| GPU | NVIDIA GeForce RTX 5070 Ti，16 GB VRAM |
+| 系统内存 | 64 GB |
 | NumPy | `1.25.0` |
 | Pillow | `11.2.1` |
 
-本机 PyTorch 为开发版（nightly），版本号应完整记录，不能简写为稳定版 `2.8.0`。`torch.version.cuda` 表示 PyTorch 的 CUDA 构建版本，不代表本机独立安装的 CUDA Toolkit 版本。
+网络依赖 PyTorch；评价指标和部分工具使用 NumPy，CAM 图像保存使用 Pillow。FADE 包含纯 PyTorch CARAFE 实现，无需安装 MMCV 或额外编译 CUDA 扩展。当前模型不依赖 torchvision、timm 或 mmsegmentation。
 
-### Dependencies
-
-| 范围 | 依赖 |
-| --- | --- |
-| 网络前向计算、FADE、DUpsampling、KDRM | `torch` |
-| 评价指标、随机种子、CAM 等工具 | `numpy` |
-| CAM 图像保存 | `Pillow`，导入名为 `PIL` |
-
-Python 建议使用 **3.10**，与当前验证环境一致。当前代码包含 `int | None` 等类型标注，请勿直接沿用早期参考仓库的 Python 3.7/3.8 环境。
-
-当前 `FADE.py` 已包含纯 PyTorch 的 CARAFE 运算和初始化实现，**不需要安装 MMCV 或编译额外 CUDA 扩展**。当前骨干网络由本仓库实现，不依赖 `torchvision`、`timm`、`mmsegmentation` 或 `resnest` 包；无需为本模型额外安装 `torchaudio`。
-
-本机另装有 `torchvision 0.22.0.dev20250321+cu128`、`tqdm 4.67.1`、`tifffile 2025.2.18`、OpenCV `4.10.0` 和 `rasterio 1.4.4`。这些不是当前网络导入及前向计算的必需依赖；如后续加入数据读取、训练或 GeoTIFF 制图入口，再按对应脚本安装。
-
-## Installation
-
-在 Conda 环境中安装依赖，然后将工作目录切换到本仓库根目录，即包含 `Model/`、`configs/` 和 `Utils/` 的目录。
+## 安装
 
 ```shell
+git clone https://github.com/SenneillSharpe/BimorphNet_code.git
+cd BimorphNet_code
 conda create -n bimorphnet python=3.10 -y
 conda activate bimorphnet
-```
-
-### GPU installation option
-
-以下使用 PyTorch 官方提供的稳定版 CUDA 12.8 wheel，作为新建环境的安装方案：
-
-```shell
 python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
 python -m pip install numpy==1.25.0 Pillow==11.2.1
 ```
 
-**该稳定版方案与上方实测 nightly 环境不同，本次未新建环境验证。** 安装后请执行下面的环境检查与 Quick start。GPU 运行需要兼容所选 PyTorch CUDA 构建版本的 NVIDIA 驱动；安装选项参见 [PyTorch 官方版本页面](https://pytorch.org/get-started/previous-versions/)。
+上述安装命令使用稳定版 PyTorch 2.8.0，与测试环境中的 nightly 构建不同，尚未进行独立环境验证。其他 CUDA 或 CPU 安装选项参见 [PyTorch 官方版本页面](https://pytorch.org/get-started/previous-versions/)。
 
-### CPU installation option
+## 实验配置
 
-无需 GPU 时，可将上述 PyTorch 安装命令替换为：
+`configs/train_config.py` 的训练参数与原主实验 `D4C_finally_01_best.pth` 保存的配置一致。路径以当前仓库为根目录，不保留原计算机的绝对路径。`D4C_finally_01` 是 BiMorphNet 的历史代码名称。
 
-```shell
-python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
-```
+| 参数 | 主实验设置 |
+| --- | --- |
+| 输入 | RGB 3通道，SAR 2通道（VV、VH） |
+| 图像尺寸 | `224 × 224` |
+| 训练 / 验证 batch size | `32 / 2` |
+| DataLoader workers | `0` |
+| 优化器 | AdamW |
+| 初始学习率 | `1e-4` |
+| Weight decay | `1e-3` |
+| AdamW betas / epsilon | `(0.9, 0.999)` / `1e-8` |
+| 最大训练轮数 | `300` |
+| 学习率调度 | 10轮 warm-up，随后 cosine decay，最低 `1e-6` |
+| AMP / 梯度累积步数 | 开启 / `1` |
+| 梯度裁剪最大范数 | `1.0` |
+| EMA | 开启，decay为 `0.999` |
+| 验证权重 | 普通模型权重，`validate_with_ema=False` |
+| 随机种子 | `42` |
+| 二值化阈值 | `0.25` |
+| 模型选择 | 最大化验证集 `composite_score` |
+| 早停 | 第81轮起监控，patience为20，min_delta为0 |
 
-随后同样安装 NumPy 和 Pillow。CPU 适合接口检查与小规模调试，完整模型运行速度取决于硬件。
+原主实验第106轮保存最佳模型，第126轮触发早停。300是最大训练轮数，不是实际执行轮数；最佳模型按综合分数选择，而非按单一 mIoU 选择。配置中的 `momentum` 是共享接口的保留字段，AdamW 使用 betas。
 
-### Check the environment
+综合分数的权重为：Precision 0.10、Recall 0.15、F1 0.20、前景 IoU 0.20、mIoU 0.15、clDice 0.15、loss 0.03、Betti-0 error 0.01、Betti-1 error 0.01；loss及Betti误差先转换为越高越好的分数再参与加权。
 
-```shell
-python -c "import sys, torch; print('Python:', sys.version); print('PyTorch:', torch.__version__); print('CUDA build:', torch.version.cuda); print('CUDA available:', torch.cuda.is_available()); print('cuDNN:', torch.backends.cudnn.version())"
-```
+主实验使用 `Utils/loss.py` 中的 `CoVFocalDiceCLDiceLoss`，组合 Focal、Dice 和 soft-clDice。前10轮权重为 `0.3 / 0.5 / 0.2`，随后采用 CoV 动态加权。实现默认使用 Focal alpha 0.25、gamma 2.0、Dice smooth 1.0、软骨架迭代3次、CoV momentum 0.95；三项权重分别约束于 `[0.25, 0.60]`、`[0.25, 0.60]`、`[0.05, 0.30]`。历史日志可核实初始权重及动态变化，但 checkpoint 未单独保存完整的损失构造参数。
 
-## Repository structure
+配置文件是参数容器。直接实例化 `BiMorphNet` 不会自动读取该文件；接入自己的训练循环时，需显式使用配置构建数据加载器、优化器、调度器和损失函数。
+
+## 目录结构
 
 ```text
-LFS/
+BimorphNet_code/
 ├── README.md
 ├── Model/
-│   ├── BiMorphNet.py       # 主模型、RCGI、HCFR 与 HDGR 调用路径
-│   ├── KDRM.py            # 依赖度与任务相关性通道重标定
-│   ├── FADE.py            # FADE、级联上采样与同尺度门控融合
-│   ├── Dupsample.py       # DUpsampling 实现
+│   ├── BiMorphNet.py
+│   ├── KDRM.py
+│   ├── FADE.py
+│   ├── Dupsample.py
 │   └── __init__.py
 ├── configs/
-│   ├── train_config.py    # 数据路径与训练配置容器
+│   ├── train_config.py
 │   └── __init__.py
-└── Utils/                 # 损失、指标、权重、EMA、调度器与 CAM 工具
+└── Utils/
 ```
 
-`configs/train_config.py` 中的参数由外部训练代码读取；直接实例化 `BiMorphNet` 不会自动读取该配置。目前配置仍保留工作项目中的设置，例如 SGD 和 300 epochs，不能直接视为已核定的论文复现配置。
+## 快速运行
 
-## Quick start
-
-在仓库根目录运行下面的 Python 示例，或保存为本地脚本后运行：
+在仓库根目录运行以下 Python 示例：
 
 ```python
 import torch
@@ -118,36 +108,28 @@ from Model.BiMorphNet import BiMorphNet
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = BiMorphNet(num_classes=1).to(device).eval()
 
-# 随机张量仅检查接口；真实影像需按训练时的方法预处理和归一化。
 rgb = torch.randn(1, 3, 224, 224, device=device)
 sar = torch.randn(1, 2, 224, 224, device=device)
 
 with torch.inference_mode():
     logits = model(rgb, sar)
-    probability = torch.sigmoid(logits)
-    prediction = (probability >= 0.25).to(torch.uint8)
+    prediction = (torch.sigmoid(logits) >= 0.25).to(torch.uint8)
 
 print("Logits:", tuple(logits.shape))
 print("Prediction:", tuple(prediction.shape))
 ```
 
-预期两项输出尺寸均为 `(1, 1, 224, 224)`。
+预期两项输出尺寸均为 `(1, 1, 224, 224)`。模型输出为未经 sigmoid 的 logits；随机输入和随机初始化仅用于检查接口。真实推理需要对应训练权重，以及与训练一致的预处理和归一化。
 
-| 张量 | 格式 | 含义 |
-| --- | --- | --- |
-| `rgb` | `[B, 3, H, W]`，浮点型 | 按 R、G、B 排列的光学影像 |
-| `sar` | `[B, 2, H, W]`，浮点型 | 按 VV、VH 排列的 SAR 影像 |
-| `logits` | `[B, 1, H, W]` | 未经 sigmoid 的前景预测分数 |
+光学输入按 R、G、B 排列，SAR输入按 VV、VH 排列，两路浮点张量必须具有相同的 batch size、空间尺寸和地理对齐关系。
 
-两路输入必须具有相同的 batch size、空间尺寸和地理对齐关系。`0.25` 是当前配置保留的二值化阈值；随机初始化模型的输出仅用于运行检查，不代表实际分割能力。
-
-## Loading trained weights
+## 加载权重
 
 ```python
 from pathlib import Path
 from Utils.checkpoint import load_model_weights
 
-# 延续 Quick start 中的 model 和 device；请自行提供对应训练权重。
+# 使用上例中的 model 和 device，自行提供模型权重。
 load_model_weights(
     Path("Model_save/BiMorphNet_best.pth"),
     model,
@@ -157,19 +139,9 @@ load_model_weights(
 model.eval()
 ```
 
-加载器支持 `model_state_dict` 格式的 checkpoint 或纯模型参数字典。网络支持将旧版本的 MCAM、CDM 和跨层投影成员路径映射至当前名称；这只解决命名兼容，仍要求骨干网络、通道数及模块配置与权重匹配。
+支持包含 `model_state_dict` 的 checkpoint 和纯参数字典。历史 MCAM、CDM及跨层投影的成员名称会在加载时映射为当前名称；骨干、通道数和模块配置仍需与权重一致。
 
-## Verification
+## 致谢
 
-在上方实测环境中已通过默认 `resnet101` 模型的 CUDA 前向检查：RGB 输入为 `(1, 3, 224, 224)`、SAR 输入为 `(1, 2, 224, 224)`，输出为有限值的 `(1, 1, 224, 224)` 张量。
-
-此检查验证当前代码的运行接口，不代替完整训练、数据集评估或论文精度复现，也不表示已验证其他操作系统或新建的稳定版环境。
-
-## Acknowledgements and references
-
-网络中的 FADE 和 DUpsampling 保留原方法名称。相关方法与实现参考：
-
-- [FADE 官方代码与论文说明](https://github.com/poppinace/fade)：Fusing the Assets of Decoder and Encoder for Task-Agnostic Upsampling，ECCV 2022。原仓库使用的环境与本仓库不同，以本 README 的环境和当前代码依赖为准。
-- [DUpsampling 原论文](https://openaccess.thecvf.com/content_CVPR_2019/papers/Tian_Decoders_Matter_for_Semantic_Segmentation_Data-Dependent_Decoding_Enables_Flexible_Feature_CVPR_2019_paper.pdf)：Decoders Matter for Semantic Segmentation: Data-Dependent Decoding Enables Flexible Feature Aggregation，CVPR 2019。
-
-本 README 的环境、安装和用法组织参考了 [FADE](https://github.com/poppinace/fade) 与 [CMX](https://github.com/huaaaliu/RGBX_Semantic_Segmentation) 的开源说明结构。CMX 在此仅作为文档组织参考，不是本仓库的软件依赖。
+- [FADE](https://github.com/poppinace/fade)：Fusing the Assets of Decoder and Encoder for Task-Agnostic Upsampling，ECCV 2022。
+- [DUpsampling](https://openaccess.thecvf.com/content_CVPR_2019/papers/Tian_Decoders_Matter_for_Semantic_Segmentation_Data-Dependent_Decoding_Enables_Flexible_Feature_CVPR_2019_paper.pdf)：Decoders Matter for Semantic Segmentation: Data-Dependent Decoding Enables Flexible Feature Aggregation，CVPR 2019。

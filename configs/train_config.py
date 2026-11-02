@@ -2,7 +2,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
-# 项目根目录：自动定位到当前 model_code 文件夹，下面所有默认路径都基于它拼接。
+# 项目根目录：自动定位到当前仓库目录，下面所有默认路径都基于它拼接。
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # 数据总目录：训练集、验证集、测试集路径统一从这里继续拼接。
 DATA_ROOT = PROJECT_ROOT / "Data"
@@ -10,7 +10,7 @@ DATA_ROOT = PROJECT_ROOT / "Data"
 
 @dataclass
 class TrainConfig:
-    # 路径配置：训练、验证、测试脚本会共同读取这些路径。
+    # 路径配置：供外部训练、验证和测试代码读取。
     project_root: Path = PROJECT_ROOT  # 项目根目录；通常不需要手动修改。
     train_rgb_dir: Path = DATA_ROOT / "train" / "rgb"  # 训练集 RGB 图像目录。
     train_sar_dir: Path = DATA_ROOT / "train" / "sar"  # 训练集 SAR 图像目录，通常为 VV/VH 双通道。
@@ -30,48 +30,19 @@ class TrainConfig:
     input_mode: str = "rgb_sar"  # 输入模态；rgb_sar 表示同时使用 RGB 和 SAR，rgb/sar 表示只使用单一模态。
     epochs: int = 300  # 最大训练轮数。
     batch_size: int = 32  # 训练批大小；显存不足时优先调小该值。
-    val_batch_size: int = 2  # 验证批大小；通常设为 1 以降低验证阶段显存占用。
+    val_batch_size: int = 2  # 验证批大小；主实验使用 2。
     num_workers: int = 0  # DataLoader 数据读取进程数；Windows/IDE 运行时 0 最稳定。
 
-    # 优化器配置。
-    # ===== SGD 训练参考配置（当前仅作为注释，不会自动生效）=====
-    # 对于 MCANet、RTFNet、SA-Gate、FEANet、DDHRNet 等 CNN/ResNet/HRNet 风格模型，
-    # 可以优先尝试 SGD + momentum 作为 AdamW 的对照实验。
-    #
-    # 若需要切换为 SGD，主要修改本文件中的以下参数：
-    # optimizer_name = "sgd"
-    # learning_rate = 1e-2      # SGD 常用初始学习率，可根据显存 batch 和验证集波动尝试 5e-3~1e-2。
-    # weight_decay = 5e-4      # CNN/DeepLab/HRNet 风格语义分割中常见的 SGD 权重衰减起点。
-    # momentum = 0.9           # SGD 动量参数。
-    #
-    # Process_step/step2_model_train.py 的 build_optimizer() 已经支持 "sgd"，
-    # 因此只改上述 TrainConfig 参数即可启用 SGD。
-    # 当前 scheduler_name 默认为 "warmup_cosine"；若后续要严格复现论文中的 poly 策略，
-    # 需要在 Utils/scheduler.py 中新增 poly scheduler 后再切换。
-    
-    # optimizer_name: str = "adamw"  # 优化器名称；训练脚本会据此选择 AdamW、Adam、SGD 等优化器。
-    # learning_rate: float = 1e-4  # 初始学习率，控制参数更新步长。
-    # weight_decay: float = 1e-3  # 权重衰减系数，用于正则化并减轻过拟合。
-    # momentum: float = 0.9  # SGD 类优化器的动量参数；使用 Adam/AdamW 时通常不会起主要作用。
-
-    optimizer_name: str = "sgd"
-    learning_rate: float = 1e-2
-    weight_decay: float = 5e-4
-    momentum: float = 0.9
+    # BiMorphNet 主实验：与 D4C_finally_01_best.pth 保存的配置一致。
+    optimizer_name: str = "adamw"
+    learning_rate: float = 1e-4
+    weight_decay: float = 1e-3
+    momentum: float = 0.9  # 保留共享接口字段；AdamW 使用 betas，不使用此值。
 
     # 学习率调度配置。
     scheduler_name: str = "warmup_cosine"  # 学习率调度策略；warmup_cosine 表示预热后余弦衰减。
     warmup_epochs: int = 10  # 学习率预热轮数，训练初期逐步升高学习率。
     min_learning_rate: float = 1e-6  # 学习率衰减到后期时保留的最小学习率。
-    # ===== SGD + poly scheduler 参考配置（当前仅作为注释，不会自动生效）=====
-    # 若后续希望按 CNN/DeepLab/HRNet 风格论文复现 SGD + poly 学习率策略，
-    # 可以将上面的 scheduler_name 从 "warmup_cosine" 改为 "poly"，并在 Utils/scheduler.py
-    # 中取消 poly_factor() 与 build_scheduler() 中 poly 分支的注释。
-    #
-    # scheduler_name = "poly"
-    # poly_power = 0.9          # 语义分割 poly scheduler 常用 power 起点。
-    # min_learning_rate = 1e-6  # 作为最低学习率下限，避免训练后期学习率完全降为 0。
-
     # 早停配置。
     early_stopping_patience: int = 20  # 验证指标连续多少轮没有明显提升后停止训练。
     early_stopping_min_delta: float = 0.0  # 判定验证指标提升所需的最小变化量。
@@ -116,5 +87,5 @@ class TrainConfig:
 
 
 def make_config() -> TrainConfig:
-    # 训练、预测、评估脚本统一通过该函数创建配置对象。
+    # 外部训练、预测和评估代码可通过该函数创建配置对象。
     return TrainConfig()
