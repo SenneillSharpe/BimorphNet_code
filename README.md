@@ -49,9 +49,9 @@ python -m pip install numpy==1.25.0 Pillow==11.2.1
 
 ## 实验配置
 
-`configs/train_config.py` 的训练参数与原主实验 `D4C_finally_01_best.pth` 保存的配置一致。路径以当前仓库为根目录，不保留原计算机的绝对路径。`D4C_finally_01` 是 BiMorphNet 的历史代码名称。
+`configs/train_config.py` 以原主实验 `D4C_finally_01_best.pth` 保存的配置为基础，当前发布版本将最大训练轮数设为150、二值化阈值设为0.5，其余训练配置沿用主实验。路径以当前仓库为根目录，不保留原计算机的绝对路径。`D4C_finally_01` 是 BiMorphNet 的历史代码名称。
 
-| 参数 | 主实验设置 |
+| 参数 | 当前发布设置 |
 | --- | --- |
 | 输入 | RGB 3通道，SAR 2通道（VV、VH） |
 | 图像尺寸 | `224 × 224` |
@@ -61,18 +61,18 @@ python -m pip install numpy==1.25.0 Pillow==11.2.1
 | 初始学习率 | `1e-4` |
 | Weight decay | `1e-3` |
 | AdamW betas / epsilon | `(0.9, 0.999)` / `1e-8` |
-| 最大训练轮数 | `300` |
+| 最大训练轮数 | `150` |
 | 学习率调度 | 10轮 warm-up，随后 cosine decay，最低 `1e-6` |
 | AMP / 梯度累积步数 | 开启 / `1` |
 | 梯度裁剪最大范数 | `1.0` |
 | EMA | 开启，decay为 `0.999` |
 | 验证权重 | 普通模型权重，`validate_with_ema=False` |
 | 随机种子 | `42` |
-| 二值化阈值 | `0.25` |
+| 二值化阈值 | `0.5` |
 | 模型选择 | 最大化验证集 `composite_score` |
 | 早停 | 第81轮起监控，patience为20，min_delta为0 |
 
-原主实验第106轮保存最佳模型，第126轮触发早停。300是最大训练轮数，不是实际执行轮数；最佳模型按综合分数选择，而非按单一 mIoU 选择。配置中的 `momentum` 是共享接口的保留字段，AdamW 使用 betas。
+原主实验使用300轮上限和0.25阈值，第106轮保存最佳模型，第126轮触发早停。当前150轮上限和0.5阈值是发布配置的调整，尚未据此重新训练或评估；最佳模型按综合分数选择，而非按单一 mIoU 选择。配置中的 `momentum` 是共享接口的保留字段，AdamW 使用 betas。
 
 综合分数的权重为：Precision 0.10、Recall 0.15、F1 0.20、前景 IoU 0.20、mIoU 0.15、clDice 0.15、loss 0.03、Betti-0 error 0.01、Betti-1 error 0.01；loss及Betti误差先转换为越高越好的分数再参与加权。
 
@@ -113,7 +113,7 @@ sar = torch.randn(1, 2, 224, 224, device=device)
 
 with torch.inference_mode():
     logits = model(rgb, sar)
-    prediction = (torch.sigmoid(logits) >= 0.25).to(torch.uint8)
+    prediction = (torch.sigmoid(logits) >= 0.5).to(torch.uint8)
 
 print("Logits:", tuple(logits.shape))
 print("Prediction:", tuple(prediction.shape))

@@ -28,12 +28,12 @@ class TrainConfig:
     # 数据和基础训练配置。
     image_size: int = 224  # 输入图像尺寸；RGB、SAR 和标签会统一缩放到该大小。
     input_mode: str = "rgb_sar"  # 输入模态；rgb_sar 表示同时使用 RGB 和 SAR，rgb/sar 表示只使用单一模态。
-    epochs: int = 300  # 最大训练轮数。
+    epochs: int = 150  # 最大训练轮数。
     batch_size: int = 32  # 训练批大小；显存不足时优先调小该值。
     val_batch_size: int = 2  # 验证批大小；主实验使用 2。
     num_workers: int = 0  # DataLoader 数据读取进程数；Windows/IDE 运行时 0 最稳定。
 
-    # BiMorphNet 主实验：与 D4C_finally_01_best.pth 保存的配置一致。
+    # 优化器沿用 BiMorphNet 主实验；轮数上限和阈值采用当前发布设置。
     optimizer_name: str = "adamw"
     learning_rate: float = 1e-4
     weight_decay: float = 1e-3
@@ -72,7 +72,7 @@ class TrainConfig:
     validate_with_ema: bool = False  # 验证阶段是否使用 EMA 权重进行评估。
 
     # 评估和运行环境配置。
-    threshold: float = 0.25  # 二值分割阈值，预测概率大于该值的像素判为目标类。
+    threshold: float = 0.5  # 二值分割阈值，预测概率大于该值的像素判为目标类。
     seed: int = 42  # 随机种子，用于尽量保证训练结果可复现。
     device: str = "cuda"  # 训练设备；cuda 表示优先使用 GPU，训练脚本会在不可用时回退到 CPU。
     best_metric_name: str = "composite_score"  # 最佳模型保存和早停依据，当前使用多指标加权综合分数。
