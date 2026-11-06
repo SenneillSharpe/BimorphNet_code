@@ -2,7 +2,7 @@
 
 **Bi-stream Cross-modal Morphology-aware Hierarchical Network for Thin-Structure Segmentation**
 
-BiMorphNet 用于光学与 SAR 遥感影像中的线性农田防护林（Linear Farmland Shelterbelts, LFS）二值语义分割。本仓库提供模型、实验配置、损失函数、评价指标及权重管理工具，暂未提供数据加载器、完整训练与测试入口、数据集和训练权重。
+BiMorphNet 用于光学与 SAR 遥感影像中的线性农田防护林（Linear Farmland Shelterbelts, LFS）二值语义分割。本仓库提供模型、实验配置、损失函数、评价指标及权重管理工具。
 
 ## 模型组成
 
@@ -13,8 +13,6 @@ BiMorphNet 用于光学与 SAR 遥感影像中的线性农田防护林（Linear 
 | KDRM | Kernelized Dependency-Relevance Modulation | `Model/KDRM.py`；`decoder.kdrm` |
 | HCFR | Hierarchical Cross-modal Feature Relay | `decoder.hcfr_relay` 及四级特征投影 |
 | HDGR | Hierarchical Detail-Guided Reconstruction | `decoder.hdgr_reconstruct` |
-
-默认骨干为两条参数独立的 ResNet-101，解码通道数为256。HDGR 结合级联 FADE、同尺度门控融合和末端 DUpsampling。模型不会自动下载 ImageNet 权重，当前不支持 `pretrained=True`。
 
 ## 安装
 
@@ -56,7 +54,7 @@ python -m pip install numpy==1.25.0 Pillow==11.2.1
 
 最佳模型按验证集综合分数选择。`momentum` 是共享配置中的保留字段，AdamW 使用 betas。
 
-当前150轮上限和0.5阈值尚未用于重新训练或评估。历史主实验采用300轮上限和0.25阈值，第106轮保存最佳模型，第126轮触发早停。
+当前150轮上限和0.5阈值尚未用于重新训练或评估。
 
 综合分数的权重为：Precision 0.10、Recall 0.15、F1 0.20、前景 IoU 0.20、mIoU 0.15、clDice 0.15、loss 0.03、Betti-0 error 0.01、Betti-1 error 0.01；loss 及 Betti 误差先转换为越高越好的分数再参与加权。
 
